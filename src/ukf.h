@@ -7,6 +7,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <cfloat>
 #include <cmath>
 
 #include "measurement_package.h"
