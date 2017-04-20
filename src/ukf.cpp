@@ -37,7 +37,7 @@ UKF::UKF() {
 
 	// initial covariance matrix
 	P_ = MatrixXd::Identity(n_x_, n_x_);
-	
+
 	// initialise process noise covariance matrix
 	Q_ = MatrixXd(n_aug_ - n_x_, n_aug_ - n_x_);
 	Q_ << std_a_ * std_a_, 0,

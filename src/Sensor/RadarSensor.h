@@ -1,6 +1,8 @@
 #ifndef RADAR_SENSOR_H_
 #define RADAR_SENSOR_H_
 
+#include <cmath>
+
 #include "../Eigen/Dense"
 #include "../measurement_package.h"
 #include "Sensor.h"

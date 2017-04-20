@@ -73,8 +73,11 @@ VectorXd RadarSensor::Dampen(const VectorXd &measurement)
 	// project into cartesian coordinates
 	state(0) = rho * cos(phi);
 	state(1) = rho * sin(phi);
-	state(2) = rho_dot * cos(phi);
-	state(3) = rho_dot * sin(phi);
+
+	double vx = rho_dot * cos(phi);
+	double vy = rho_dot * sin(phi);
+	// velocity
+	state(2) = sqrt((vx*vx) + (vy*vy));
 
 	return state;
 }
