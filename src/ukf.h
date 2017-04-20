@@ -1,17 +1,24 @@
 #ifndef UKF_H
 #define UKF_H
 
-#include "measurement_package.h"
 #include "Eigen/Dense"
+
 #include <vector>
 #include <string>
+#include <iostream>
 #include <fstream>
-#include "tools.h"
+#include <cmath>
 
-using Eigen::MatrixXd;
-using Eigen::VectorXd;
+#include "measurement_package.h"
+#include "tools.h"
+#include "Sensor/RadarSensor.h"
+#include "Sensor/LidarSensor.h"
 
 class UKF {
+private:
+	RadarSensor radarSensor_;
+	LidarSensor lidarSensor_;
+
 public:
 
   ///* initially set to false, set to true in first call of ProcessMeasurement
@@ -24,16 +31,19 @@ public:
   bool use_radar_;
 
   ///* state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
-  VectorXd x_;
+  Eigen::VectorXd x_;
 
   ///* state covariance matrix
-  MatrixXd P_;
+	Eigen::MatrixXd P_;
+
+	///* Process noise covariance matrix
+	Eigen::MatrixXd Q_;
 
   ///* predicted sigma points matrix
-  MatrixXd Xsig_pred_;
+	Eigen::MatrixXd Xsig_pred_;
 
-  ///* time when the state is true, in us
-  long long time_us_;
+	///* Previous timestamp
+	long long previous_timestamp_;
 
   ///* Process noise standard deviation longitudinal acceleration in m/s^2
   double std_a_;
@@ -41,23 +51,8 @@ public:
   ///* Process noise standard deviation yaw acceleration in rad/s^2
   double std_yawdd_;
 
-  ///* Laser measurement noise standard deviation position1 in m
-  double std_laspx_;
-
-  ///* Laser measurement noise standard deviation position2 in m
-  double std_laspy_;
-
-  ///* Radar measurement noise standard deviation radius in m
-  double std_radr_;
-
-  ///* Radar measurement noise standard deviation angle in rad
-  double std_radphi_;
-
-  ///* Radar measurement noise standard deviation radius change in m/s
-  double std_radrd_ ;
-
   ///* Weights of sigma points
-  VectorXd weights_;
+	Eigen::VectorXd weights_;
 
   ///* State dimension
   int n_x_;
@@ -68,11 +63,14 @@ public:
   ///* Sigma point spreading parameter
   double lambda_;
 
-  ///* the current NIS for radar
-  double NIS_radar_;
+	///* Current Normalised Innovation Squared value
+	double NIS_;
 
-  ///* the current NIS for laser
-  double NIS_laser_;
+	///* Minimum delay between sensor measurements
+	double time_delta;
+
+	///* Sensors array
+	std::vector<Sensor*> sensors_;
 
   /**
    * Constructor
@@ -85,29 +83,34 @@ public:
   virtual ~UKF();
 
   /**
-   * ProcessMeasurement
-   * @param meas_package The latest measurement data of either radar or laser
-   */
-  void ProcessMeasurement(MeasurementPackage meas_package);
+  * ProcessMeasurement
+  * @param measurement: The latest sensor measurement data
+  */
+  void ProcessMeasurement(MeasurementPackage measurement);
+
+	/*
+	* Sets the time delta of the transition state function
+	* @param delta_t: Time delta expressed in seconds
+	*/
+	void Sigma(double delta_t);
+  
+	/*
+	* Transforms the sigma point into measurement space
+	*/
+	Eigen::MatrixXd Transform(Sensor* sensor);
+
+	/**
+  * Predicts sigma points, the state, and the state covariance matrix
+  */
+  void Predict();
 
   /**
-   * Prediction Predicts sigma points, the state, and the state covariance
-   * matrix
-   * @param delta_t Time between k and k+1 in s
-   */
-  void Prediction(double delta_t);
-
-  /**
-   * Updates the state and the state covariance matrix using a laser measurement
-   * @param meas_package The measurement at k+1
-   */
-  void UpdateLidar(MeasurementPackage meas_package);
-
-  /**
-   * Updates the state and the state covariance matrix using a radar measurement
-   * @param meas_package The measurement at k+1
-   */
-  void UpdateRadar(MeasurementPackage meas_package);
+  * Updates the state and the state covariance matrix using the given sensor measurement
+  * @param z: Measurement vector at t+1
+	* @param z_pred: Predicted measurement at t+1
+	* @param R: Sensor measurement covariance matrix
+  */
+	void Update(const Eigen::MatrixXd &Zsigma, const Eigen::VectorXd &z, const Eigen::MatrixXd &R);
 };
 
 #endif /* UKF_H */
