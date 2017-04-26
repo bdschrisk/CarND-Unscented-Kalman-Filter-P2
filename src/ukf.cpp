@@ -20,14 +20,14 @@ UKF::UKF() {
 	n_aug_ = 7;
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.7;
+  std_a_ = 0.808;
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.7;
+  std_yawdd_ = 0.707;
 
 	// define spreading factor
 	lambda_ = (0.5 * (n_x_ + n_aug_) - (n_aug_ + n_aug_)) / 2.0;
-
-	time_delta = 0.001;
+	// max time delta between predictions
+	time_delta = 0.1;
 
 	// initial initialisation...
 	is_initialized_ = false;
@@ -78,7 +78,7 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement) {
 			break;
 		}
 	}
-	
+
 	// check valid sensor
 	if (sensor == NULL) {
 		cout << "ProcessMeasurement() - Error: Unknown sensor type '" << measurement.sensor_type_ << "'";
@@ -109,19 +109,23 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement) {
 	// compute the time delta
 	double dt = (measurement.timestamp_ - previous_timestamp_) / 1000000.0;	// in seconds
 	previous_timestamp_ = measurement.timestamp_;
-	
+
 	/*****************************************************************************
 	*  UKF Predict and Update
 	****************************************************************************/
 	// Predict Sigma points for transition
-	this->Sigma(dt);
 
 	// check for multiple simultaneous measurements
-	if (dt > time_delta)
-	{
-		// Predicts state P
+	while (dt > time_delta) {
+		this->Sigma(time_delta);
 		this->Predict();
+
+		dt -= time_delta;
 	}
+
+	this->Sigma(dt);
+	// Predicts state P
+	this->Predict();
 
 	if (sensor->is_enabled_) {
 		VectorXd pos = sensor->Dampen(measurement.raw_measurements_);
@@ -262,10 +266,6 @@ void UKF::Predict() {
 	for (int i = 0; i < 2 * n_aug_ + 1; i++) {
 		VectorXd x_diff = Xsig_pred_.col(i) - x_;
 
-		// angle normalization
-		while (x_diff(3) > M_PI) x_diff(3) -= 2.0 * M_PI;
-		while (x_diff(3) < -M_PI) x_diff(3) += 2.0 * M_PI;
-
 		P_ = P_ + weights_(i) * (x_diff * x_diff.transpose());
 	}
 }
@@ -293,6 +293,7 @@ void UKF::Update(const MatrixXd &Zsigma, const VectorXd &z, const MatrixXd &R) {
 	for (int i = 0; i < 2 * n_aug_ + 1; i++) {
 		VectorXd x_diff = Xsig_pred_.col(i) - x_;
 		VectorXd z_diff = Zsigma.col(i) - z_pred;
+
 		Tc = Tc + weights_(i) * (x_diff * z_diff.transpose());
 	}
 
@@ -311,8 +312,10 @@ void UKF::Update(const MatrixXd &Zsigma, const VectorXd &z, const MatrixXd &R) {
 	// calculate Kalman gain K;
 	MatrixXd K = Tc * Si;
 
+	VectorXd z_dp = (z - z_pred);
+
 	// update state mean and covariance matrix
-	x_ = x_ + K * (z - z_pred);
+	x_ = x_ + K * z_dp;
 	P_ = P_ - K * S * K.transpose();
 
 	// update NIS value
